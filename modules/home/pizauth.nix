@@ -12,7 +12,7 @@ in
 {
   options.swarselservices.pizauth = {
     enable = lib.mkEnableOption ''
-      Pizauth, a commandline OAuth2 authentication daemon.
+      Pizauth, a commandline OAuth2 authentication daemon
     '';
 
     package = lib.mkPackageOption pkgs "pizauth" { };
@@ -31,7 +31,7 @@ in
               type = types.str;
               readOnly = true;
               description = ''
-                    Unique identifier of the account. This is set to the
+                Unique identifier of the account. This is set to the
                 attribute name of the account configuration.
               '';
             };
@@ -67,7 +67,7 @@ in
             scopes = mkOption {
               type = types.nullOr (types.listOf types.str);
               description = ''
-                      The scopes which the OAuth2 token will give access to. Optional.
+                The scopes which the OAuth2 token will give access to. Optional.
                 Note that Office365 requires the non-standard "offline_access" scope to be specified in order for pizauth to be able to operate successfully.
               '';
               default = [ ];
@@ -82,7 +82,7 @@ in
               type = types.nullOr types.str;
               default = null;
               description = ''
-                The login hint for the account provider. Optional.
+                An optional login hint for the account provider.
               '';
             };
 
@@ -109,19 +109,17 @@ in
 
     xdg.configFile."pizauth.conf".source =
       let
+        indent = "  ";
+
         renderScopes =
           scopes:
           let
-            indent = "  ";
             quoted = map (s: "\"${s}\"") scopes;
             joined = lib.concatStringsSep ",\n${indent}${indent}" quoted;
           in
           "[\n${indent}${indent}${joined}\n${indent}]";
 
         renderAccount =
-          let
-            indent = "  ";
-          in
           name: acc:
           ''
             account "${name}" {
@@ -152,41 +150,38 @@ in
           lib.mapAttrsToList (name: acc: renderAccount name acc) cfg.accounts
         );
 
-        configFile = pkgs.writeTextFile {
-          name = "pizauth.conf";
-          text =
-            lib.optionalString (cfg.extraConfig != null && cfg.extraConfig != "") "${cfg.extraConfig}\n"
-            + renderedAccounts;
-        };
       in
-      configFile;
+      pkgs.writeTextFile {
+        name = "pizauth.conf";
+        text =
+          lib.optionalString (cfg.extraConfig != null && cfg.extraConfig != "") "${cfg.extraConfig}\n"
+          + renderedAccounts;
+      };
 
-    systemd.user.services = {
-      pizauth = {
-        Unit = {
-          Description = "Pizauth OAuth2 token manager";
-          After = [ "network.target" ];
-        };
+    systemd.user.services.pizauth = {
+      Unit = {
+        Description = "Pizauth OAuth2 token manager";
+        After = [ "network.target" ];
+      };
 
-        Service = {
-          Type = "simple";
-          ExecStart = "${pkgs.pizauth}/bin/pizauth server -vvvv -d";
-          ExecReload = "${pkgs.pizauth}/bin/pizauth reload";
-          ExecStop = "${pkgs.pizauth}/bin/pizauth shutdown";
-          Restart = "on-failure";
+      Service = {
+        Type = "simple";
+        ExecStart = "${lib.getExe cfg.package} server -vvvv -d";
+        ExecReload = "${lib.getExe cfg.package} reload";
+        ExecStop = "${lib.getExe cfg.package} shutdown";
+        Restart = "on-failure";
 
-          LockPersonality = true;
-          MemoryDenyWriteExecute = true;
-          NoNewPrivileges = true;
-          PrivateUsers = true;
-          RestrictNamespaces = true;
-          SystemCallArchitectures = "native";
-          SystemCallFilter = "@system-service";
-        };
+        LockPersonality = true;
+        MemoryDenyWriteExecute = true;
+        NoNewPrivileges = true;
+        PrivateUsers = true;
+        RestrictNamespaces = true;
+        SystemCallArchitectures = "native";
+        SystemCallFilter = "@system-service";
+      };
 
-        Install = {
-          WantedBy = [ "default.target" ];
-        };
+      Install = {
+        WantedBy = [ "default.target" ];
       };
     };
   };
